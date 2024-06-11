@@ -294,5 +294,12 @@ if __name__ == '__main__':
     elif question == "3":
         print("Starting Question 3- Bigger Models")
         q3()
+    elif question.lower() == "all":
+        print("Starting Question 1- Full Fine-Tune")
+        q1()
+        print("Starting Question 2- LoRA Fine-Tune")
+        q2()
+        print("Starting Question 3- Bigger Models")
+        q3()
     else:
-        print("Invalid Question Number (should be 1, 2 or 3)")
+        print("Invalid Question Number (should be \'1\', \'2\', \'3\' or \'all\')")
