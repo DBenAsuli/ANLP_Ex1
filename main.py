@@ -5,9 +5,9 @@
 import os
 import json
 import torch
+import matplotlib
 from tqdm import tqdm
 from copy import deepcopy
-import matplotlib
 import matplotlib.pyplot as plt
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -53,7 +53,7 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=3, learnin
 
         print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.2f}")
 
-        # Validation
+        # Evaluate the model's accuracy
         model.eval()
         val_losses = []
         all_preds = []
@@ -86,10 +86,9 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=3, learnin
         "Accuracy": f"{accuracy * 100}%"
     }
 
+    # Save results to a text file
     if not os.path.exists('./Q1_Results/'):
         os.makedirs('./Q1_Results/')
-
-    # Save results to a text file
     with open('./Q1_Results/evaluation_results.txt', 'w') as f:
         f.write(json.dumps(results, indent=4))
 
@@ -104,21 +103,22 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, 
     optimal_r_factor = None
     optimal_learning_rate = None
 
-    # Iterate over 10 different R-Factors
+    # Iterate over different R-Factors
     for r_factor in r_factors:
         print(f"Training r_factor: {r_factor}")
 
-        # Re-Instantiating the model
+        # Re-Instantiating the model to reset parameters
         model = deepcopy(base_model)
         model.to(device)
 
+        # LoRA optimizing over the query and value projection matrices.
         optimizer_grouped_parameters = [
             {"params": [param for name, param in model.named_parameters() if "query" in name or "value" in name],
              "lr": start_learning_rate}, {"params": [param for name, param in model.named_parameters() if
                                                      "query" not in name and "value" not in name], "lr": 1e-7}, ]
         optimizer = AdamW(optimizer_grouped_parameters)
 
-        # Defining changing LR Valuea according to R-Factor
+        # Defining changing LR Values according to R-Factor
         lr_func = lambda step: (end_learning_rate / start_learning_rate) ** (
                 step / (len(train_loader) * num_epochs * r_factor))
         lr_scheduler_query_value = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_func)
@@ -143,14 +143,14 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, 
                 optimizer.step()
                 lr_scheduler_query_value.step()
 
-                # Record learning rate and loss
+                # Record learning rate and loss for future comparisons
                 current_lr = optimizer_grouped_parameters[0]['lr']
                 learning_rates.append(current_lr)  # Record LR for query and value projection matrices
                 training_losses.append(loss.item())
 
             print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.2f}")
 
-        # Evaluate model accuracy
+        # Evaluate the model's accuracy
         model.eval()
         preds = []
         true_labels = []
@@ -173,7 +173,7 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, 
         accuracy_scores.append(accuracy)
         print(f"Accuracy for r_factor={r_factor}: {accuracy * 100:.2f}%")
 
-        # Update the best accuracy and corresponding r factor and learning rate
+        # Update the current best accuracy + corresponding r-factor and learning rate
         if accuracy > best_accuracy:
             best_accuracy = accuracy
             optimal_r_factor = r_factor
@@ -186,10 +186,9 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, 
         "Optimal Accuracy": f"{max(accuracy_scores) * 100}%"
     }
 
+    # Save results to a text file
     if not os.path.exists(f"./Q{q_number}_Results/"):
         os.makedirs(f"./Q{q_number}_Results/")
-
-    # Save results to a text file
     with open(f"./Q{q_number}_Results/evaluation_results.txt", 'w') as f:
         f.write(json.dumps(results, indent=4))
 
@@ -289,11 +288,11 @@ def q3():
     encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
     # Define DataLoader for Training and Validation
-    train_loader = DataLoader(encoded_dataset['train'], batch_size=4, shuffle=True, num_workers=2)
-    val_loader = DataLoader(encoded_dataset['validation'], batch_size=4, num_workers=2)
+    train_loader = DataLoader(encoded_dataset['train'], batch_size=1, shuffle=True, num_workers=2)
+    val_loader = DataLoader(encoded_dataset['validation'], batch_size=1, num_workers=2)
 
     # Train and evaluate second model
-    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, num_epochs=4,
+    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, num_epochs=3,
                             q_number="3", start_learning_rate=2e-5, end_learning_rate=1e-3)
 
 
