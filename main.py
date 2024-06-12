@@ -7,6 +7,7 @@ import json
 import torch
 from tqdm import tqdm
 from copy import deepcopy
+import matplotlib
 import matplotlib.pyplot as plt
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -27,7 +28,8 @@ def plot_accuracy_vs_r_factor(r_factors, accuracy_scores, save_path):
     plt.savefig(save_path)  # Save the plot as an image file
     plt.close()
 
-def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=4, learning_rate=2e-5):
+
+def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=3, learning_rate=3e-5):
     optimizer = AdamW(model.parameters(), lr=learning_rate)
 
     # Training and evaluation loop
@@ -49,7 +51,7 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=4, learnin
             loss.backward()
             optimizer.step()
 
-        print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.4f}")
+        print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.2f}")
 
         # Validation
         model.eval()
@@ -73,8 +75,8 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=4, learnin
                 all_labels.extend(labels.cpu().numpy())
 
             accuracy = accuracy_score(all_labels, all_preds)
-            print(f"Validation loss for epoch {epoch + 1}: {sum(val_losses) / len(val_losses):.4f}")
-            print(f"Validation accuracy for epoch {epoch + 1}: {accuracy:.4f}")
+            print(f"Validation loss for epoch {epoch + 1}: {sum(val_losses) / len(val_losses):.2f}")
+            print(f"Validation accuracy for epoch {epoch + 1}: {accuracy * 100:.2f}%")
 
     # Evaluate the model
     results = {
@@ -92,9 +94,9 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=4, learnin
         f.write(json.dumps(results, indent=4))
 
 
-def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=4, start_learning_rate=2e-5,
+def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, start_learning_rate=2e-5,
                             end_learning_rate=1e-1, q_number="2"):
-    r_factors = [4 * (2 ** (i / 9)) for i in range(10)]
+    r_factors = [4, 10, 18, 26, 32]
     learning_rates = []
     training_losses = []
     accuracy_scores = []
@@ -118,7 +120,7 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=4, 
 
         # Defining changing LR Valuea according to R-Factor
         lr_func = lambda step: (end_learning_rate / start_learning_rate) ** (
-                    step / (len(train_loader) * num_epochs * r_factor))
+                step / (len(train_loader) * num_epochs * r_factor))
         lr_scheduler_query_value = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_func)
 
         # Training loop
@@ -146,7 +148,7 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=4, 
                 learning_rates.append(current_lr)  # Record LR for query and value projection matrices
                 training_losses.append(loss.item())
 
-            print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.4f}")
+            print(f"Train loss for epoch {epoch + 1}: {sum(train_losses) / len(train_losses):.2f}")
 
         # Evaluate model accuracy
         model.eval()
@@ -169,7 +171,7 @@ def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=4, 
 
         accuracy = accuracy_score(true_labels, preds)
         accuracy_scores.append(accuracy)
-        print(f"Accuracy for r_factor={r_factor}: {accuracy:.4f}")
+        print(f"Accuracy for r_factor={r_factor}: {accuracy * 100:.2f}%")
 
         # Update the best accuracy and corresponding r factor and learning rate
         if accuracy > best_accuracy:
@@ -203,6 +205,7 @@ def q1():
     def preprocess(data):
         return tokenizer(data["sentence1"], data["sentence2"], truncation=True, padding='max_length',
                          max_length=128)
+
     # prepare the dataset for training the model
     # The column "label"  indicating whether two sentences are paraphrases or not.
     # Renaming it to "labels" for Torch usage, and setting the format of the dataset to a Torch-compatible format
@@ -213,8 +216,8 @@ def q1():
     encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
     # Define DataLoader for Training and Validation
-    train_loader = DataLoader(encoded_dataset['train'], batch_size=16, shuffle=True, num_workers=2)
-    val_loader = DataLoader(encoded_dataset['validation'], batch_size=16, num_workers=2)
+    train_loader = DataLoader(encoded_dataset['train'], batch_size=8, shuffle=True, num_workers=2)
+    val_loader = DataLoader(encoded_dataset['validation'], batch_size=8, num_workers=2)
 
     # Train and evaluate model
     train_and_evaluate_q1(model=model, train_loader=train_loader, val_loader=val_loader)
@@ -240,11 +243,14 @@ def q2():
     encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
     # Define DataLoader for Training and Validation
-    train_loader = DataLoader(encoded_dataset['train'], batch_size=16, shuffle=True, num_workers=2)
-    val_loader = DataLoader(encoded_dataset['validation'], batch_size=16, num_workers=2)
+    train_loader = DataLoader(encoded_dataset['train'], batch_size=8, shuffle=True, num_workers=2)
+    val_loader = DataLoader(encoded_dataset['validation'], batch_size=8, num_workers=2)
 
     # Train and evaluate model
-    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader)
+    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader,
+                            start_learning_rate=1e-5,
+                            end_learning_rate=1e-3)
+
 
 # Bigger models
 def q3():
@@ -271,11 +277,11 @@ def q3():
     val_loader = DataLoader(encoded_dataset['validation'], batch_size=4, num_workers=2)
 
     # Train and evaluate first model
-    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, q_number="3")
+    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, num_epochs=4,
+                            q_number="3", start_learning_rate=2e-5, end_learning_rate=1e-3)
 
-    # Load the tokenizer and the second model
     tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b")
-    model = AutoModelForSequenceClassification.from_pretrained("google/gemma-2b", num_labels=2).to(device)
+    model = AutoModelForCausalLM.from_pretrained("google/gemma-2b").to(device)
 
     # prepare the dataset for training the model
     encoded_dataset = dataset.map(preprocess, batched=True, num_proc=2)
@@ -287,7 +293,9 @@ def q3():
     val_loader = DataLoader(encoded_dataset['validation'], batch_size=4, num_workers=2)
 
     # Train and evaluate second model
-    train_and_evaluate_LoRA(model=model, train_loader=train_loader, val_loader=val_loader, q_number="3b")
+    train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, num_epochs=4,
+                            q_number="3", start_learning_rate=2e-5, end_learning_rate=1e-3)
+
 
 if __name__ == '__main__':
     question = input("Please enter question number: ")
@@ -304,8 +312,10 @@ if __name__ == '__main__':
     elif question.lower() == "all":
         print("Starting Question 1- Full Fine-Tune")
         q1()
+        print("\n--------------\n")
         print("Starting Question 2- LoRA Fine-Tune")
         q2()
+        print("\n--------------\n")
         print("Starting Question 3- Bigger Models")
         q3()
     else:
