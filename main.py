@@ -94,8 +94,7 @@ def train_and_evaluate_q1(model, train_loader, val_loader, num_epochs=3, learnin
 
 
 def train_and_evaluate_LoRA(base_model, train_loader, val_loader, num_epochs=3, start_learning_rate=2e-5,
-                            end_learning_rate=1e-1, q_number="2"):
-    r_factors = [4, 10, 18, 26, 32]
+                            end_learning_rate=1e-1, q_number="2", r_factors=[4, 10, 18, 26, 32]):
     learning_rates = []
     training_losses = []
     accuracy_scores = []
@@ -293,7 +292,7 @@ def q3():
 
     # Train and evaluate second model
     train_and_evaluate_LoRA(base_model=model, train_loader=train_loader, val_loader=val_loader, num_epochs=3,
-                            q_number="3", start_learning_rate=2e-5, end_learning_rate=1e-3)
+                            q_number="3", start_learning_rate=2e-5, end_learning_rate=1e-3, r_factors=[2, 4, 8, 12, 16])
 
 
 if __name__ == '__main__':
