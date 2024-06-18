@@ -1,0 +1,6 @@
+{
+    "num of Epochs": 3,
+    "Learning Rate": 3e-05,
+    "Loss": 0.588811965111424,
+    "Accuracy": "68.62745098039215%"
+}

@@ -1,6 +1,0 @@
-{
-    "Num of Epochs": 3,
-    "Optimal r-factor": 10,
-    "Optimal Learning Rate": 1.5848931924611138e-05,
-    "Optimal Accuracy": "85.5392156862745%"
-}
